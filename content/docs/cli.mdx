@@ -17,6 +17,7 @@ Usage:
 
 Options:
   -e, --eval <QUERY>   inline query
+  -i, --interactive    force interactive mode even with piped stdin
   -h, --help           show this help
   -V, --version        show version
 ```
@@ -55,7 +56,7 @@ session, like `node` or `python`:
 
 ```
 xsql 0.1.0 — interactive mode
-End statements with `;`. Commands: .help  .dump (print modified docs)  exit
+End statements with `;`. Commands: .help  .dump  BEGIN  COMMIT  ROLLBACK [TO name]  CHECKPOINT name (alias SAVEPOINT)  exit
 
 xsql> USE db.xml
  ...> SELECT GROUP goods;
@@ -66,11 +67,48 @@ xsql> USE db.xml
   continuation prompt (` ...> `) open for multi-line input.
 - `USE` and any in-memory edits persist across statements in the same
   session.
-- `.dump` prints every document modified so far.
-- `.help` shows the usage banner.
+- `.dump` **previews** every document modified so far — printed to stdout,
+  never touches disk, doesn't affect transaction state below.
+- `.help` shows the REPL command reference.
 - `exit` / `quit` / `.exit` (or EOF, Ctrl+D / Ctrl+Z) leaves the REPL —
-  emitting any pending edits to stdout on the way out, so `xsql > out.xml`
-  still captures them.
+  emitting any pending edits to stdout on the way out (so `xsql > out.xml`
+  still captures them), and printing a warning to stderr if they were never
+  `COMMIT`ted to disk.
+
+### Transactions
+
+The REPL is always implicitly "inside a transaction" per loaded document —
+mutating statements only ever change the in-memory copy, exactly as before.
+**`COMMIT` is the only thing that writes to disk.** Both a bare SQL-style
+spelling and a dot-prefixed spelling work for every command below (`COMMIT`
+or `.commit`, etc.):
+
+- `COMMIT` — writes every modified document back to its original file path.
+  A document loaded via `USE INPUT` has no file to write to, so it's printed
+  to stdout instead (same as `.dump`).
+- `ROLLBACK` — discards every uncommitted edit, restoring each document to
+  its state as of the last `COMMIT` (or when it was first loaded).
+- `CHECKPOINT <name>` (alias `SAVEPOINT <name>`) — snapshots every loaded
+  document under a name, without committing anything.
+- `ROLLBACK TO <name>` — restores every document to its `<name>` snapshot,
+  discarding any later checkpoints but keeping `<name>` itself (so you can
+  roll back to it again). Errors if no document has that checkpoint.
+- `BEGIN` — clears all checkpoints (a "fresh start" marker). Since the
+  session is always implicitly in a transaction, `BEGIN` doesn't change
+  what a bare `ROLLBACK` restores to — only `COMMIT`/`ROLLBACK` do that.
+
+```
+xsql> USE db.xml
+ ...> UPDATE goods SET cost = cost * 2;
+xsql> CHECKPOINT before_tax;
+xsql> UPDATE goods SET cost = cost + 1;
+xsql> ROLLBACK TO before_tax;
+xsql> COMMIT;
+committed -> db.xml
+```
+
+Transactions and `COMMIT` are REPL-only; one-shot script/`-e`/stdin-script
+runs always write their output to stdout, as described above.
 
 ## Diagnostics
 

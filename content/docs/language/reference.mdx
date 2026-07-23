@@ -8,14 +8,16 @@ description: Every construct, one line each.
 | Construct | Meaning |
 |---|---|
 | `USE <path>` / `USE "path"` / `USE INPUT` | selects the current document (`INPUT` = XML piped on stdin); sticky until the next `USE` |
-| `SELECT GROUP g [FOREACH ...]` | prints the group, or the elements passing the loop's `WHERE`s |
+| `SELECT GROUP g [AS alias] [FOREACH ...]` | prints the group, or the elements passing the loop's `WHERE`s; `AS alias` renames the printed tag (display-only, see below) |
 | `REPLACE GROUP g RAW XML \`...\`` | replaces the group's children with the fragment |
 | `INSERT INTO GROUP g RAW XML \`...\`` | appends the fragment to the group |
 | `MERGE INTO GROUP g RAW XML \`...\`` | upsert (idempotent): matches children by `id`, then `name`, then tag; matched → cited attributes updated (rest preserved; fragment children, when present, replace the existing ones), unmatched → inserted |
 | `DELETE [IGNORE] GROUP g` | removes the whole group element |
 | `DELETE [IGNORE] TAG t` | removes every element with tag `t` (`IGNORE`: no error when none match) |
-| `SELECT TAG t [FOREACH ...\|OUTPUT ...]` | prints every element with tag `t`, wherever it sits |
-| `SELECT ROOT [FOREACH ...\|OUTPUT ...]` | prints every element in the document, any tag |
+| `RENAME [IGNORE] GROUP g AS new_tag` | permanently renames the group element's tag |
+| `RENAME [IGNORE] TAG t AS new_tag` | permanently renames every element with tag `t` |
+| `SELECT TAG t [AS alias] [FOREACH ...\|OUTPUT ...]` | prints every element with tag `t`, wherever it sits |
+| `SELECT ROOT [AS alias] [FOREACH ...\|OUTPUT ...]` | prints every element in the document, any tag |
 | `UPDATE (TAG t \| ROOT \| [GROUP] g) SET a = e, ... [WHERE expr] [LIMIT 1]` | MySQL-style sugar for a FOREACH: guard, then the SETs; `LIMIT 1` = BREAK after the first match |
 | `MERGE (TAG t \| ROOT \| [GROUP] g) SET a = e, ... [WHERE expr] [LIMIT 1]` | same, but attributes are written only where missing (idempotent) |
 | `DELETE FROM (TAG t \| ROOT \| [GROUP] g) [WHERE expr] [LIMIT 1]` | removes the matching elements (the container survives) |
@@ -65,6 +67,20 @@ Aggregate functions (`COUNT`, `MIN`, `MAX`, `SUM`, `AVG`, `FIRST`, `LAST`,
 `ANY`, `ALL`) are only valid as a direct `OUTPUT` item, not inside `WHERE`
 or a `SET` expression — see
 [SELECT and OUTPUT](/docs/language/select-and-output).
+
+## AS: two unrelated uses
+
+`AS` shows up in two places with different meaning:
+
+- `OUTPUT expr AS name` names a projected **column** in a flat row (see
+  [SELECT and OUTPUT](/docs/language/select-and-output)).
+- `SELECT ... AS alias` renames an **element's tag** on the way out —
+  display-only, the document is untouched. Its permanent sibling is
+  `RENAME ... AS new_tag`, which actually edits the document (see
+  [Mutations](/docs/language/mutations)).
+
+Either way, only the outermost printed/renamed element is affected —
+descendants keep their real tags.
 
 ## Settings
 

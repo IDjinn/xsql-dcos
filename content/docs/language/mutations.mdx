@@ -1,6 +1,6 @@
 ---
 title: Mutations
-description: SET, MERGE, DELETE, REPLACE, INSERT — the primitive write verbs.
+description: SET, MERGE, DELETE, RENAME, REPLACE, INSERT — the primitive write verbs.
 ---
 
 These are the primitive write verbs; the [MySQL-style shorthands](/docs/language/shorthands)
@@ -42,6 +42,24 @@ DELETE TAG Obsolete;                      every <Obsolete> element, any depth
 
 Without `IGNORE`, deleting something that doesn't exist is an error.
 `IGNORE` suppresses it.
+
+## RENAME — permanently rename a tag
+
+```sql
+RENAME GROUP goods AS items;        ; <goods> becomes <items>
+RENAME TAG ItemSpec AS Item;        ; every <ItemSpec> becomes <Item>, any depth
+RENAME IGNORE GROUP legacy AS x;    ; no error if `legacy` doesn't exist
+```
+
+`RENAME GROUP g AS new_tag` finds the group the same way `DELETE GROUP`
+does (first element by tag/`name`/`id`) and rewrites just its tag, in
+place — attributes and children are untouched. `RENAME TAG t AS new_tag`
+rewrites the tag of every matching element, at any depth, the same set
+`DELETE TAG`/`SELECT TAG` would reach.
+
+This is a permanent, document-editing rename. For a display-only rename
+that only affects what gets printed (leaving the document untouched), see
+`SELECT ... AS alias` in [SELECT and OUTPUT](/docs/language/select-and-output).
 
 ## REPLACE GROUP — wholesale replacement
 

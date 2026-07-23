@@ -7,8 +7,8 @@ description: Scripts, blocks, comments, and how USE scopes them.
 
 A script is a sequence of **blocks**. Each block has a **source** — the
 document it operates on, set by `USE` — and a list of **verbs**
-(`SELECT`, `FOREACH`, `SET`, `DELETE`, `REPLACE`, `INSERT`, `MERGE`, or one
-of the MySQL-style shorthands).
+(`SELECT`, `FOREACH`, `SET`, `DELETE`, `RENAME`, `REPLACE`, `INSERT`,
+`MERGE`, or one of the MySQL-style shorthands).
 
 ```sql
 ; USE is sticky: it applies to every following block until the next USE.
@@ -56,7 +56,7 @@ including how nested `FOREACH ... IN TAG` differs from a top-level one.
 - [SELECT and OUTPUT](/docs/language/select-and-output) — querying, printing
   results.
 - [Mutations](/docs/language/mutations) — `SET`, `MERGE`, `DELETE`,
-  `REPLACE`, `INSERT`.
+  `RENAME`, `REPLACE`, `INSERT`.
 - [MySQL-style shorthands](/docs/language/shorthands) — `UPDATE`,
   `DELETE FROM`, `MERGE ... SET`.
 - [FOREACH and WHERE](/docs/language/foreach-and-where) — loops, guards,

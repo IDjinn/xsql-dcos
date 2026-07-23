@@ -61,6 +61,10 @@ touching `eval/` or `xml/`:
   never sees them as distinct constructs.
 - **Inside a `FOREACH`,** the loop variable, the group name, and a bare
   attribute name all resolve to the current element.
+- **`SELECT ... AS alias` is display-only.** It overrides the outer tag
+  passed to the serializer (`serialize_subtree_as_into`), never the DOM —
+  `RENAME GROUP`/`RENAME TAG` are the permanent counterpart, mutating
+  `Element::tag` directly, the same lookup `DELETE GROUP`/`DELETE TAG` use.
 
 ## Workspace layout
 

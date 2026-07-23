@@ -33,6 +33,28 @@ SELECT TAG ItemSpec;   all ItemSpec elements, any depth
 SELECT ROOT;           every element in the document, any tag
 ```
 
+## SELECT ... AS alias
+
+`AS alias` after any selector (`GROUP`, `TAG`, or `ROOT`) renames the
+printed tag on the way out — display-only, the document itself is
+untouched:
+
+```sql
+SELECT GROUP goods AS items;      ; <items>...</items>, children unchanged
+SELECT TAG ItemSpec AS Item;      ; every match printed as <Item>
+
+; composes with FOREACH — applies to whatever gets printed, WHERE'd rows
+; included, and to OUTPUT * (a whole-element projection)
+SELECT GROUP goods AS items
+FOREACH good IN goods
+    WHERE good.cost > 500
+;
+```
+
+Only the outermost element's tag changes; children keep their real tags.
+For a permanent rename that edits the document, see `RENAME` in
+[Mutations](/docs/language/mutations).
+
 ## OUTPUT
 
 `OUTPUT` is the emission point — like a SQL column list. It's evaluated

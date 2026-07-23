@@ -1,0 +1,52 @@
+---
+title: Performance
+description: What's parallelized, why it's safe, and what makes serialization fast.
+---
+
+## Design
+
+- Hand-rolled single-pass lexer and recursive-descent parser; an
+  arena-based DOM (flat `Vec`, index links) on top of quick-xml.
+- Rayon parallelism, applied at three levels:
+  - Documents referenced by distinct `USE` sources load and parse in
+    parallel.
+  - Blocks targeting *different* documents execute in parallel; blocks
+    targeting the *same* document stay sequential.
+  - Large `FOREACH` loops (≥1024 children, no `BREAK`) evaluate their
+    expressions in parallel before applying mutations sequentially —
+    exact sequential semantics, parallel speed. `TAG` loops parallelize
+    only when no match is nested inside another.
+- Output strings are pre-sized from the DOM (both the serializer and the
+  final output assembly), avoiding repeated reallocation on large
+  documents.
+
+## Why parallel execution is safe here
+
+The arena DOM (`xml/dom.rs`) stores nodes in a flat `Vec<Element>` linked
+by plain `usize` indexes, rather than as a tree of owned/reference-counted
+nodes. That layout is what makes read-only parallel evaluation over
+`&Document` sound: many threads can read the same arena concurrently
+without any interior mutability or locking, because evaluation never
+mutates the arena directly — it only produces a plan.
+
+The **evaluate-then-apply** split (in `eval/mod.rs`) is the other half:
+for large loops, expression evaluation (which is read-only) runs in
+parallel across children, producing a list of mutation plans; those plans
+are then applied to the document sequentially, in original order. This
+guarantees the observable result is bit-for-bit identical to running the
+loop fully sequentially — parallelism only changes wall-clock time, never
+behavior. Loops containing `BREAK` skip this entirely and run sequential,
+since `BREAK`'s early-exit semantics depend on visiting elements in a
+fixed order.
+
+## Measuring it
+
+```sql
+SET FORMAT = OFF;   compact output, if you don't need to eyeball the XML
+ANALYZE;            per-stage timing report on stderr
+```
+
+`ANALYZE` (or `SET ANALYZE = ON`) prints lex, parse, stdin/file read, XML
+parse (per document), per-block execution, serialization, output assembly,
+stdout write, total DOM memory, and total wall time — see
+[CLI: Diagnostics](/docs/cli#diagnostics).

@@ -1,0 +1,39 @@
+---
+title: Expressions
+description: Operators, literals, and the dynamic typing rules.
+---
+
+## Operators
+
+```
+=  !=  <>  <  >  <=  >=  AND  OR  NOT  +  -  *  /
+```
+
+`!=` and `<>` are equivalent inequality operators.
+
+## Literals
+
+- Numbers: `500`, `1.5`
+- Strings: `"New Office Name"`
+- Attribute references: bare (`id`), or scoped (`good.id`, `office.total`)
+
+## Dynamic typing
+
+Values are dynamically typed:
+
+- **Numeric semantics apply whenever both operands parse as numbers** —
+  `good.cost * 2` does arithmetic if `cost` looks like a number.
+- **`+` on non-numeric operands concatenates** as strings, instead of
+  erroring.
+- **Missing attributes compare as false** (SQL-NULL-ish) — this is what
+  lets `WHERE some_optional_attr > 5` silently skip elements that don't
+  have `some_optional_attr`, rather than erroring. Use
+  [`WHERE REQUIRED`](/docs/language/foreach-and-where#where-required) when a
+  missing attribute should be a hard error instead.
+
+## Where expressions show up
+
+- `WHERE <expr>` — must ultimately be truthy/falsy.
+- `SET v.attr = <expr>` / `MERGE v.attr = <expr>` — the right-hand side.
+- `OUTPUT <expr> [AS name]` — any expression, named with `AS` unless it's a
+  bare attribute reference.

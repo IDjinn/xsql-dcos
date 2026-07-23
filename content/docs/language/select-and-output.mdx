@@ -1,0 +1,61 @@
+---
+title: SELECT and OUTPUT
+description: Querying elements and shaping printed rows.
+---
+
+`SELECT` never modifies a document — it only prints.
+
+## SELECT GROUP
+
+```sql
+; print the whole group as-is
+SELECT GROUP goods;
+
+; without FOREACH, SELECT loops implicitly over the group's children
+SELECT GROUP goods OUTPUT id, level;
+
+; with FOREACH: filter and shape rows explicitly
+SELECT GROUP goods
+FOREACH good IN goods
+    WHERE good.cost > 500
+    OUTPUT good.id, good.cost, good.cost * 2 AS double_cost
+;
+```
+
+## SELECT TAG
+
+`SELECT TAG t` prints every element with tag `t`, at any depth:
+
+```sql
+SELECT TAG ItemSpec;   all ItemSpec elements, any depth
+```
+
+## OUTPUT
+
+`OUTPUT` is the emission point — like a SQL column list. It's evaluated
+when execution reaches it, and prints a flat element containing only the
+cited attributes/expressions:
+
+- `OUTPUT *` — the whole current element. This is the implicit default of a
+  `SELECT` loop that has no `OUTPUT` at all.
+- `OUTPUT good.id, good.cost` — only those attributes.
+- `OUTPUT good.cost * 2 AS double_cost` — a computed expression needs `AS`
+  to name its output column; bare attribute references don't.
+- A missing attribute is silently **omitted** from the row (not printed as
+  empty) — contrast with `WHERE`, where a missing attribute evaluates as
+  false.
+
+`OUTPUT` also works inside a plain `FOREACH` (not just `SELECT` loops), and
+inside nested loops — where it joins scopes from multiple levels into one
+flat row:
+
+```sql
+FOREACH office IN offices
+    FOREACH member IN office
+        WHERE member.cost > 5
+        OUTPUT office.id AS office, member.name, member.cost
+;
+```
+
+Here each printed row combines the outer `office` element with the inner
+`member` element currently being visited.

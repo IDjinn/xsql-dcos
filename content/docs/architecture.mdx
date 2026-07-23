@@ -1,0 +1,80 @@
+---
+title: Architecture
+description: The interpreter pipeline, for contributors.
+---
+
+A classic interpreter pipeline, one module per stage under `xsql/src/`.
+
+## Pipeline
+
+1. **`lexer.rs`** — hand-rolled single-pass lexer producing spanned tokens.
+   `;` terminates a statement block, and everything after it on that line is
+   a comment.
+2. **`parser.rs`** — recursive-descent parser producing **`ast.rs`**
+   (`Script` → `Block`s, each with a sticky `Source` from `USE`, containing
+   `Verb`s / `Foreach` / `Expr`).
+3. **`eval/mod.rs`** — the interpreter. Key points:
+   - All distinct `USE` sources load and parse **in parallel** (rayon).
+   - Blocks are grouped by target document; groups for *different*
+     documents run in parallel, blocks within one document stay
+     sequential. `SELECT` output is buffered per block and flushed in
+     script order.
+   - `FOREACH` over ≥1024 children (`PAR_FOREACH_THRESHOLD`) uses
+     evaluate-then-apply: expressions are evaluated read-only in parallel,
+     producing mutation plans, which are then applied sequentially — exact
+     sequential semantics must be preserved. Loops containing `BREAK` stay
+     fully sequential.
+   - `eval/value.rs` — the dynamically typed `Value`: numeric semantics
+     when both operands parse as numbers, `+` concatenates otherwise,
+     missing attributes compare as false.
+4. **`xml/`** — an arena DOM on top of quick-xml.
+   - `dom.rs`: nodes live in a flat `Vec<Element>`, linked by `NodeId`
+     (a plain `usize`) indexes — this layout is what makes read-only
+     parallel evaluation over `&Document` safe.
+   - `parse.rs` builds it.
+   - `serialize.rs` pretty-prints it. This is data-only: comments and
+     formatting are not preserved (a roadmap item).
+5. **`error.rs`** — `XsqlError` with an optional `Span`; `render()`
+   produces the `file:line:col` + source-line diagnostic. Keep spans on
+   errors wherever a span is available.
+
+`main.rs` is CLI argument handling plus the REPL; all actual logic lives in
+the library, so tests and the binary share it.
+
+## Invariants
+
+These are the rules the interpreter is built around — respect them when
+touching `eval/` or `xml/`:
+
+- **Parallelism must never change observable behavior.** The
+  evaluate-then-apply split and per-document block grouping exist purely to
+  keep results identical to fully sequential execution — parallelism is an
+  execution strategy, never a semantics.
+- **A group lookup matches the first element** whose tag, `name`, or `id`
+  attribute equals the given name. **A tag lookup (`TAG t`) matches every
+  element** whose tag equals `t` (attributes don't participate);
+  tag-based loops only take the parallel `FOREACH` path after a
+  disjointness check, since matches can nest.
+- **The MySQL-style shorthands are pure parser sugar.** `UPDATE`,
+  `MERGE ... SET`, and `DELETE FROM` desugar to `Verb::Foreach` (`WHERE`
+  guard first, then the writes, `LIMIT 1` → `BREAK`) — the interpreter
+  never sees them as distinct constructs.
+- **Inside a `FOREACH`,** the loop variable, the group name, and a bare
+  attribute name all resolve to the current element.
+
+## Workspace layout
+
+- `xsql/` — the library and binary.
+- `xsql-tests/` — all tests (lexer, parser, DOM, interpreter, CLI
+  end-to-end) and fixtures. Run `cargo test` from the workspace root.
+
+## Testing
+
+```bash
+cargo test                         # everything
+cargo test --test parser           # one test file (lexer|parser|xml|eval|cli)
+cargo test --test eval test_name   # a single test by name
+```
+
+`cli.rs` runs the compiled binary end-to-end, so those tests need a debug
+build — `cargo test` handles that automatically.

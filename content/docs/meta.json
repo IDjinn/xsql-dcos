@@ -1,0 +1,11 @@
+{
+  "title": "xsql",
+  "pages": [
+    "index",
+    "getting-started",
+    "cli",
+    "language",
+    "architecture",
+    "performance"
+  ]
+}

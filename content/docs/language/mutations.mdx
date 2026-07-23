@@ -1,0 +1,95 @@
+---
+title: Mutations
+description: SET, MERGE, DELETE, REPLACE, INSERT — the primitive write verbs.
+---
+
+These are the primitive write verbs; the [MySQL-style shorthands](/docs/language/shorthands)
+desugar to loops built from these.
+
+## SET — write an attribute
+
+```sql
+FOREACH office IN office
+    WHERE office.id = 216000
+    SET office.name = "New Office Name"
+    BREAK;
+;
+```
+
+`SET v.attr = <expr>` always overwrites, unconditionally.
+
+## MERGE — write only if missing (idempotent)
+
+```sql
+; add an attribute only where missing — existing values win, even different ones
+FOREACH arm IN arms
+    MERGE arm.tier = 1
+;
+```
+
+`MERGE v.attr = <expr>` is the idempotent counterpart to `SET`: if the
+attribute already has a value, that value wins — even if it differs from
+what you're merging in. Safe to re-run.
+
+## DELETE — remove an attribute or element
+
+```sql
+DELETE IGNORE arm.unlock_civi_science;   attribute; IGNORE: no error if absent
+DELETE arm;                              the current element itself
+DELETE GROUP legacy_stuff;                the whole group container
+DELETE TAG Obsolete;                      every <Obsolete> element, any depth
+```
+
+Without `IGNORE`, deleting something that doesn't exist is an error.
+`IGNORE` suppresses it.
+
+## REPLACE GROUP — wholesale replacement
+
+```sql
+REPLACE GROUP new_continued_cost
+RAW XML `
+<ItemSpec id="52034301" level="1" cost="500"/>
+<ItemSpec id="52034302" level="2" cost="1000"/>
+`;
+```
+
+Replaces the group's children entirely with the parsed fragment.
+
+## INSERT INTO GROUP — append
+
+```sql
+INSERT INTO GROUP goods RAW XML `<ItemSpec id="999"/>`;
+```
+
+Appends the fragment's elements to the group, alongside whatever's already
+there.
+
+## MERGE INTO GROUP — upsert
+
+```sql
+; upsert (idempotent): match children by id (then name, then tag);
+; matched -> cited attributes updated, the rest preserved; no match -> inserted
+MERGE INTO GROUP goods
+RAW XML `
+<ItemSpec id="52034301" cost="600"/>
+<ItemSpec id="52034999" level="9" cost="9000"/>
+`;
+```
+
+For each element in the fragment, `MERGE INTO GROUP` looks for an existing
+child matching by `id`, then `name`, then tag:
+
+- **Matched** — only the attributes present in the fragment are updated;
+  everything else on the existing element is preserved. If the fragment
+  element has children of its own, they replace the existing children.
+- **Unmatched** — the fragment element is inserted as a new child.
+
+This makes `MERGE INTO GROUP` the safe, re-runnable way to apply a batch of
+"these attributes, if they differ" updates without clobbering fields you
+didn't mention.
+
+## RAW XML fragments
+
+`RAW XML \`...\`` is a backtick-delimited raw fragment, parsed as XML and
+used by `REPLACE`, `INSERT INTO`, and `MERGE INTO`. It can contain multiple
+sibling elements.

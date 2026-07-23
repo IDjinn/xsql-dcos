@@ -1,0 +1,90 @@
+---
+title: FOREACH and WHERE
+description: Loops, guards, nesting, scope, and BREAK.
+---
+
+## FOREACH
+
+```sql
+FOREACH arm IN arms
+    DELETE IGNORE arm.unlock_civi_science
+    DELETE IGNORE arm.science
+;
+```
+
+`FOREACH v IN g` iterates the group's direct children, binding each to
+`v`. Inside the loop, the loop variable, the group name, and a bare
+attribute name all refer to the current element — `good.id`, `goods.id`,
+and `id` are interchangeable.
+
+## WHERE
+
+`WHERE <expr>` guards everything after it in the same loop body: elements
+that don't match are skipped for the *remaining* ops, not just the next
+one.
+
+```sql
+SELECT GROUP goods
+FOREACH good IN goods
+    WHERE goods.id > 52034301
+;
+```
+
+A missing attribute participates as **null**, which compares as false — so
+elements without the attribute are silently skipped, not errored.
+
+### WHERE REQUIRED
+
+```sql
+SELECT GROUP goods
+FOREACH good IN goods
+    WHERE REQUIRED level >= 2
+;
+```
+
+`WHERE REQUIRED attr <cond>` makes the attribute mandatory: an element
+without it aborts the whole run with an error, instead of being silently
+skipped. Use this when a missing attribute would indicate a malformed
+document rather than an expected absence.
+
+## Nested FOREACH
+
+```sql
+FOREACH office IN offices
+    WHERE office.id = 216000
+    FOREACH member IN office
+        SET member.reviewed = 1
+        SET office.total = office.total + member.cost
+;
+```
+
+`IN <outer var>` iterates the current element's children; `IN <subgroup>`
+looks for a group by that name inside the current element. Either way,
+**inner loops can read and write outer scopes** — the innermost binding
+wins when names collide, but outer variables stay visible and mutable
+(`office.total` above is written from inside the `member` loop).
+
+Ops written after a nested `FOREACH` belong to that inner loop, not the
+outer one — so a `BREAK` inside the inner loop only ends the inner loop.
+
+## BREAK
+
+```sql
+FOREACH office IN office
+    WHERE office.id = 216000
+    SET office.name = "New Office Name"
+    BREAK;
+;
+```
+
+Stops the (innermost) loop. `UPDATE ... LIMIT 1` compiles to exactly this
+pattern.
+
+## A parallelism note
+
+Loops over ≥1024 children evaluate expressions in parallel and apply
+mutations sequentially afterward — see [Performance](/docs/performance).
+Loops containing `BREAK` are the one exception: they always run fully
+sequential, since `BREAK`'s semantics depend on visiting elements in order.
+You don't need to think about this when writing scripts — it's purely an
+execution-strategy detail, and results are identical either way.

@@ -1,0 +1,68 @@
+---
+title: Getting Started
+description: Build xsql and run your first query.
+---
+
+## Build
+
+xsql is a standard Cargo workspace.
+
+```bash
+cargo build --release        # -> target/release/xsql
+```
+
+## Run
+
+There are four ways to invoke it:
+
+```bash
+xsql                                          # interactive REPL
+xsql script.xsql                              # run a script file
+xsql -e "USE db.xml SELECT GROUP arms;"       # inline query
+cat script.xsql | xsql                        # script piped from stdin
+cat db.xml | xsql -e "USE INPUT ..."          # XML piped from stdin (filter mode)
+```
+
+## Your first query
+
+Given a document `db.xml`:
+
+```xml
+<Database>
+  <Group name="goods">
+    <ItemSpec id="52034301" level="1" cost="500"/>
+    <ItemSpec id="52034302" level="2" cost="1000"/>
+  </Group>
+</Database>
+```
+
+Print every `ItemSpec` under the `goods` group whose cost is over 500:
+
+```bash
+xsql -e '
+USE db.xml
+SELECT GROUP goods
+FOREACH good IN goods
+    WHERE good.cost > 500
+;'
+```
+
+Double every item's cost in place:
+
+```bash
+xsql -e 'USE db.xml UPDATE goods SET cost = cost * 2;'
+```
+
+Output goes to stdout: `SELECT` prints matching elements immediately, and
+`UPDATE` (which mutates the document) causes the whole `db.xml` document to
+be pretty-printed to stdout once the script finishes. Redirect it wherever
+you need:
+
+```bash
+xsql -e 'USE db.xml UPDATE goods SET cost = cost * 2;' > db.xml
+```
+
+## Next
+
+Read the [CLI reference](/docs/cli) for REPL details, or jump straight into
+the [language reference](/docs/language).

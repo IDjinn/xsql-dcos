@@ -1,0 +1,26 @@
+---
+title: Settings
+description: Script-scoped global settings — FORMAT, IGNORE_COMMENTS, ANALYZE.
+---
+
+`SET <setting> = ON|OFF` is a **global** setting, not an attribute write —
+it needs no `USE`, can appear anywhere in a script, and applies to the
+whole run. In the REPL, settings persist across statements in the same
+session.
+
+```sql
+SET FORMAT = OFF;          compact single-line XML output
+SET IGNORE_COMMENTS = OFF; preserve XML comments in loaded documents
+ANALYZE;                   print per-stage timings to stderr
+```
+
+Accepted values: `ON`/`OFF`, also `TRUE`/`FALSE`/`1`/`0`. Setting names are
+case-insensitive.
+
+| Setting | Default | Effect |
+|---|---|---|
+| `FORMAT` | `ON` | `ON`: pretty-printed XML output. `OFF`: compact, one line per document/selected element. |
+| `IGNORE_COMMENTS` | `ON` | `ON`: XML comments are dropped when parsing. `OFF`: comments are preserved and re-emitted (they're never loop elements — a `FOREACH` never binds to a comment). |
+| `ANALYZE` | `OFF` | `ON`: after the run, prints a per-stage timing report to stderr — see [CLI: Diagnostics](/docs/cli#diagnostics). |
+
+`ANALYZE;` on its own is shorthand for `SET ANALYZE = ON;`.

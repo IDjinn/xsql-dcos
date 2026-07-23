@@ -1,0 +1,14 @@
+{
+  "title": "Language",
+  "pages": [
+    "index",
+    "select-and-output",
+    "mutations",
+    "shorthands",
+    "foreach-and-where",
+    "tag-vs-group",
+    "expressions",
+    "settings",
+    "reference"
+  ]
+}

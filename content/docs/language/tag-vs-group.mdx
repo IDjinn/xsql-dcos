@@ -1,0 +1,73 @@
+---
+title: Group vs. Tag
+description: Two different ways to select elements, and when to use each.
+---
+
+Nearly every verb can target either a **group** or a **tag**. Picking the
+wrong one is the most common source of surprise, so here's the direct
+comparison.
+
+## GROUP
+
+A group is the **first** element whose tag — or `name`/`id` attribute —
+equals the given name.
+
+```sql
+SELECT GROUP goods;              ; matches by tag OR name OR id, first match only
+SELECT GROUP 110000;              ; numeric name -> matches <Group id="110000">
+SELECT GROUP "Group";             ; quoted -> for names colliding with keywords
+```
+
+The verb then operates on (typically iterates) that one container's
+**direct children**.
+
+## TAG
+
+A tag selector matches **every** element whose tag equals `t`, at **any
+depth** in the document. Attributes don't participate in the match at all.
+
+```sql
+SELECT TAG ItemSpec;                            ; every ItemSpec, any depth
+FOREACH i IN TAG ItemSpec SET i.reviewed = 1;   ; document-wide edit
+UPDATE TAG ItemSpec SET cost = 0 WHERE cost < 0;
+DELETE TAG Obsolete;                            ; removes every <Obsolete> element
+```
+
+Use `TAG` for documents that have no reliable group/container structure —
+where the elements you care about are scattered at different depths, not
+gathered under one parent.
+
+## Nested TAG
+
+Inside a loop, `IN TAG t` searches only the **current element's subtree**,
+not the whole document:
+
+```sql
+FOREACH office IN offices
+    FOREACH m IN TAG Member
+        SET m.office = office.id
+;
+```
+
+A nested `TAG` search that matches nothing inside the current element
+simply iterates zero times — it does not fall back to a document-wide
+search.
+
+## Why it matters for parallelism
+
+`TAG` loops only take the parallel evaluate-then-apply path after a
+disjointness check: since tag matches can nest inside one another (an
+`ItemSpec` inside an `ItemSpec`, for instance), the interpreter verifies no
+match is nested inside another match before parallelizing. `GROUP` loops
+don't need this check, since a group's children are always a flat,
+non-overlapping set. See [Performance](/docs/performance) for the full
+picture.
+
+## Quick reference
+
+| | `GROUP g` | `TAG t` |
+|---|---|---|
+| Matches | first element with tag/name/id == `g` | every element with tag == `t` |
+| Depth | that one container | any depth |
+| Iterates | the container's direct children | the matches themselves |
+| Nested (`IN ...`) | a subgroup found inside the current element | the current element's subtree only |

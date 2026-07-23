@@ -1,0 +1,38 @@
+---
+title: Overview
+description: What xsql is, and why it exists.
+---
+
+`xsql` is a SQL-like language for querying and mutating XML files. It's built
+for automated editing toolchains: it reads a script (or an inline query),
+applies it to XML documents in memory, and writes the result to stdout — a
+well-behaved Unix filter.
+
+## Why
+
+Editing XML with `sed`/`awk` is fragile, and writing a one-off script against
+an XML library for every small mutation is slow. `xsql` gives you a small
+declarative language — `SELECT`, `FOREACH`, `WHERE`, `SET`, `MERGE`,
+`DELETE`, `UPDATE` — for the common cases: read some elements, filter them,
+change or remove attributes, insert or upsert fragments.
+
+## How it works, in one paragraph
+
+A script is a sequence of blocks, each scoped to a document selected by
+`USE` (sticky until the next `USE`). Each block is a list of verbs —
+`SELECT`, `FOREACH`, `SET`, `DELETE`, `REPLACE`, `INSERT`, `MERGE`, or the
+MySQL-style shorthands (`UPDATE`, `DELETE FROM`, `MERGE ... SET`), which
+desugar to a `FOREACH` under the hood. `SELECT` prints immediately; any
+document a script actually modified is pretty-printed to stdout once the
+whole script finishes.
+
+## Where to go next
+
+- [Getting started](/docs/getting-started) — build the binary, run your first
+  query.
+- [CLI](/docs/cli) — the four ways to invoke `xsql`, and the REPL.
+- [Language](/docs/language) — the full language reference: verbs,
+  expressions, settings.
+- [Architecture](/docs/architecture) — how the interpreter is built, for
+  contributors.
+- [Performance](/docs/performance) — what's parallelized, and why it's safe.

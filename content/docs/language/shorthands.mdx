@@ -1,0 +1,63 @@
+---
+title: MySQL-style shorthands
+description: UPDATE, MERGE ... SET, DELETE FROM — sugar over FOREACH.
+---
+
+`UPDATE`, `MERGE ... SET`, and `DELETE FROM` are **pure parser sugar**: the
+parser desugars each into a `FOREACH` (`WHERE` guard first, then the
+writes, and `LIMIT 1` becomes a trailing `BREAK`). The interpreter never
+sees these forms — it only ever executes the equivalent loop. This is why
+their semantics are identical to writing the loop by hand.
+
+## UPDATE
+
+```sql
+UPDATE office SET name = "New Office Name" WHERE id = 216000 LIMIT 1;
+
+; is exactly equivalent to:
+FOREACH office IN office
+    WHERE office.id = 216000
+    SET office.name = "New Office Name"
+    BREAK;
+;
+```
+
+Without `WHERE`/`LIMIT`, it updates every element of the group. Assignments
+take full expressions and multiple comma-separated targets:
+
+```sql
+UPDATE goods SET cost = cost * 2, level = level + 1 WHERE cost > 500;
+```
+
+`UPDATE TAG t SET ...` targets a tag instead of a group:
+
+```sql
+UPDATE TAG ItemSpec SET cost = 0 WHERE cost < 0;
+```
+
+## MERGE ... SET
+
+Same shape as `UPDATE`, but attributes are written only where missing
+(idempotent) — like `MERGE v.attr = ...` in loop form:
+
+```sql
+MERGE arms SET tier = 1;
+```
+
+## DELETE FROM
+
+Removes matching elements; the *container* survives (contrast with
+`DELETE GROUP`, which removes the container itself):
+
+```sql
+DELETE FROM goods WHERE cost > 500;
+DELETE TAG Obsolete;                            ; removes every <Obsolete> element
+```
+
+## Full shorthand grammar
+
+| Form | Desugars to |
+|---|---|
+| `UPDATE (TAG t \| [GROUP] g) SET a = e, ... [WHERE expr] [LIMIT 1]` | `FOREACH` with the `WHERE` guard, then the `SET`s, then `BREAK` if `LIMIT 1` |
+| `MERGE (TAG t \| [GROUP] g) SET a = e, ... [WHERE expr] [LIMIT 1]` | same, but `MERGE` writes instead of `SET` |
+| `DELETE FROM (TAG t \| [GROUP] g) [WHERE expr] [LIMIT 1]` | `FOREACH` with the `WHERE` guard, then `DELETE` on the element |

@@ -1,0 +1,67 @@
+---
+title: Full Reference
+description: Every construct, one line each.
+---
+
+## Constructs
+
+| Construct | Meaning |
+|---|---|
+| `USE <path>` / `USE "path"` / `USE INPUT` | selects the current document (`INPUT` = XML piped on stdin); sticky until the next `USE` |
+| `SELECT GROUP g [FOREACH ...]` | prints the group, or the elements passing the loop's `WHERE`s |
+| `REPLACE GROUP g RAW XML \`...\`` | replaces the group's children with the fragment |
+| `INSERT INTO GROUP g RAW XML \`...\`` | appends the fragment to the group |
+| `MERGE INTO GROUP g RAW XML \`...\`` | upsert (idempotent): matches children by `id`, then `name`, then tag; matched → cited attributes updated (rest preserved; fragment children, when present, replace the existing ones), unmatched → inserted |
+| `DELETE [IGNORE] GROUP g` | removes the whole group element |
+| `DELETE [IGNORE] TAG t` | removes every element with tag `t` (`IGNORE`: no error when none match) |
+| `SELECT TAG t [FOREACH ...\|OUTPUT ...]` | prints every element with tag `t`, wherever it sits |
+| `UPDATE (TAG t \| [GROUP] g) SET a = e, ... [WHERE expr] [LIMIT 1]` | MySQL-style sugar for a FOREACH: guard, then the SETs; `LIMIT 1` = BREAK after the first match |
+| `MERGE (TAG t \| [GROUP] g) SET a = e, ... [WHERE expr] [LIMIT 1]` | same, but attributes are written only where missing (idempotent) |
+| `DELETE FROM (TAG t \| [GROUP] g) [WHERE expr] [LIMIT 1]` | removes the matching elements (the container survives) |
+| `FOREACH v IN g <ops>` | iterates the group's direct children |
+| `FOREACH v IN TAG t <ops>` | iterates every element with tag `t` — document-wide at top level, within the current element's subtree when nested (zero nested matches iterate nothing) |
+| `FOREACH v2 IN v <ops>` (nested) | iterates the current element's children (`v` = an enclosing loop variable) or a group found inside the current element; ops after a nested loop belong to it, and a `BREAK` inside it only ends the inner loop |
+| `WHERE <expr>` | guard: skips remaining ops for non-matching elements (a missing attribute participates as null) |
+| `WHERE REQUIRED attr <cond>` | like WHERE, but the attribute is mandatory: an element without it is a hard error (plain WHERE skips it silently) |
+| `SET v.attr = <expr>` | writes an attribute |
+| `MERGE v.attr = <expr>` | writes the attribute only when missing; an existing value wins, even a different one (idempotent) |
+| `OUTPUT <expr> [AS name], ...` | emission point: prints a flat element with only the cited attributes/expressions, evaluated when execution reaches it (missing attributes are omitted; non-attribute expressions need `AS`); works in SELECT loops, plain FOREACH loops and nested loops (mixing scopes into one row) |
+| `OUTPUT *` | prints the whole current element — the implicit default of a SELECT loop without OUTPUT |
+| `DELETE [IGNORE] v.attr` | removes an attribute (`IGNORE`: no error if absent) |
+| `DELETE v` | removes the current element |
+| `BREAK` | stops the loop |
+| `SET <setting> = ON\|OFF` | global setting (script scope, needs no `USE`); persists across REPL statements |
+| `ANALYZE` | shorthand for `SET ANALYZE = ON`: per-stage timing report on stderr |
+
+## Selector rules
+
+A *group* is the first element whose tag — or `name`/`id` attribute —
+equals the given name. A *tag* selector (`TAG t`) instead matches **all**
+elements whose tag equals `t` — attributes don't participate — at any
+depth; use it when the document has no reliable group structure. Group
+names may be identifiers (`arms`), numbers (`SELECT GROUP 110000` —
+matches `<Group id="110000">`), or quoted strings (`SELECT GROUP "Group"`
+— for names that collide with keywords).
+
+Inside a loop, the loop variable, the group name, and a bare attribute name
+all refer to the current element (`good.id`, `goods.id`, and `id` are
+interchangeable). In nested loops the enclosing variables stay visible —
+the innermost binding wins — so an inner loop can read and write
+attributes of its outer elements.
+
+## Expressions
+
+`= != <> < > <= >= AND OR NOT + - * /`, numbers, `"strings"`, attribute
+references. Values are dynamically typed — numeric semantics apply
+whenever both operands parse as numbers; `+` on non-numbers concatenates.
+Missing attributes compare as false (SQL-NULL-ish).
+
+## Settings
+
+Values `ON`/`OFF`, also `TRUE`/`FALSE`/`1`/`0`; names case-insensitive.
+
+| Setting | Default | Effect |
+|---|---|---|
+| `FORMAT` | `ON` | `ON`: pretty-printed XML output; `OFF`: compact, one line per document/selected element |
+| `IGNORE_COMMENTS` | `ON` | `ON`: XML comments are dropped when parsing; `OFF`: comments are preserved and re-emitted (they are never loop elements) |
+| `ANALYZE` | `OFF` | `ON`: after the run, prints a per-stage report to stderr — lex, parse, stdin/file read, XML parse per document, per-block execution, serialization, output assembly, stdout write, total DOM memory, total time |

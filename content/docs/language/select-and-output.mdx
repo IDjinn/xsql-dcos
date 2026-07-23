@@ -63,11 +63,11 @@ FOREACH office IN offices
 Here each printed row combines the outer `office` element with the inner
 `member` element currently being visited.
 
-## Aggregate OUTPUT: COUNT, MIN, MAX, SUM, AVG
+## Aggregate OUTPUT: COUNT, MIN, MAX, SUM, AVG, FIRST, LAST, ANY, ALL
 
 A regular `OUTPUT` prints one row per element the loop reaches. An
 **aggregate** `OUTPUT` instead summarizes every reached element into a
-single line of comma-joined plain numbers — no XML wrapper:
+single line of comma-joined plain values — no XML wrapper:
 
 ```sql
 FOREACH v IN ItemSpec WHERE v.type = 0 OUTPUT COUNT(v.id);
@@ -77,14 +77,34 @@ FOREACH v IN ItemSpec WHERE v.type = 0
     OUTPUT MIN(v.cost), MAX(v.cost), SUM(v.cost), AVG(v.cost)
 ;
 ; -> 10,30,40,20
+
+FOREACH v IN ItemSpec WHERE v.type = 0 OUTPUT FIRST(v.name), LAST(v.name);
+; -> a,b
+
+FOREACH v IN ItemSpec OUTPUT COUNT(*);   ; every row, nulls included
+; -> 3
+
+FOREACH v IN ItemSpec WHERE v.type = 0 OUTPUT ANY(v.cost > 25), ALL(v.cost > 5);
+; -> true,true
 ```
 
 Rules:
 
-- `COUNT(expr)` counts elements where `expr` is non-null; `MIN`/`MAX`/`SUM`/
-  `AVG` ignore elements where `expr` is missing or non-numeric (same
-  null-skipping spirit as everywhere else in the language).
-- Zero contributing elements reports `0` for every function, not an error.
+- `COUNT(expr)` counts elements where `expr` is non-null. `COUNT(*)` is the
+  one function that takes a literal `*` instead of an expression: it counts
+  every reached row unconditionally, including ones a plain `COUNT(expr)`
+  would skip for being null.
+- `MIN`/`MAX`/`SUM`/`AVG` ignore elements where `expr` is missing or
+  non-numeric (same null-skipping spirit as everywhere else in the
+  language).
+- `FIRST(expr)`/`LAST(expr)` return the first/last non-null value of `expr`
+  in reach order (nulls skipped, same as `MIN`/`MAX`).
+- `ANY(expr)`/`ALL(expr)` are boolean aggregates over every reached row's
+  truthiness (a missing attribute is falsy, same as `WHERE`) — nothing is
+  skipped, so every reached row counts toward the result.
+- Zero contributing elements reports `0` for `COUNT`/`MIN`/`MAX`/`SUM`/`AVG`,
+  an empty value for `FIRST`/`LAST`, `false` for `ANY`, and `true` for `ALL`
+  (vacuously — same convention as SQL's `ALL` over an empty set).
 - An aggregate `OUTPUT` must be the loop's **only** `OUTPUT` — mixing it
   with a plain attribute/expression, or with a second `OUTPUT`, is a parse
   error, since there's no single row shape that could satisfy both a
@@ -94,6 +114,5 @@ Rules:
 - Aggregate functions are only valid as a direct `OUTPUT` item, not inside
   `WHERE` or a `SET` expression.
 
-`COUNT`/`MIN`/`MAX`/`SUM`/`AVG` cover the common cases. Possible future
-additions: `FIRST`/`LAST` (first/last matching value), `CONCAT`/
-`GROUP_CONCAT` (join values with a separator), a distinct-values `COUNT`.
+Possible future additions: `CONCAT`/`GROUP_CONCAT` (join values with a
+separator), a distinct-values `COUNT`.

@@ -29,10 +29,13 @@ take full expressions and multiple comma-separated targets:
 UPDATE goods SET cost = cost * 2, level = level + 1 WHERE cost > 500;
 ```
 
-`UPDATE TAG t SET ...` targets a tag instead of a group:
+`UPDATE TAG t SET ...` targets a tag instead of a group; `UPDATE ROOT SET
+...` drops the tag filter entirely, targeting every element in the
+document:
 
 ```sql
 UPDATE TAG ItemSpec SET cost = 0 WHERE cost < 0;
+UPDATE ROOT SET reviewed = 1 WHERE cost > 500;
 ```
 
 ## MERGE ... SET
@@ -51,6 +54,7 @@ Removes matching elements; the *container* survives (contrast with
 
 ```sql
 DELETE FROM goods WHERE cost > 500;
+DELETE FROM ROOT WHERE cost > 500;              ; every element in the document, any tag
 DELETE TAG Obsolete;                            ; removes every <Obsolete> element
 ```
 
@@ -58,6 +62,6 @@ DELETE TAG Obsolete;                            ; removes every <Obsolete> eleme
 
 | Form | Desugars to |
 |---|---|
-| `UPDATE (TAG t \| [GROUP] g) SET a = e, ... [WHERE expr] [LIMIT 1]` | `FOREACH` with the `WHERE` guard, then the `SET`s, then `BREAK` if `LIMIT 1` |
-| `MERGE (TAG t \| [GROUP] g) SET a = e, ... [WHERE expr] [LIMIT 1]` | same, but `MERGE` writes instead of `SET` |
-| `DELETE FROM (TAG t \| [GROUP] g) [WHERE expr] [LIMIT 1]` | `FOREACH` with the `WHERE` guard, then `DELETE` on the element |
+| `UPDATE (TAG t \| ROOT \| [GROUP] g) SET a = e, ... [WHERE expr] [LIMIT 1]` | `FOREACH` with the `WHERE` guard, then the `SET`s, then `BREAK` if `LIMIT 1` |
+| `MERGE (TAG t \| ROOT \| [GROUP] g) SET a = e, ... [WHERE expr] [LIMIT 1]` | same, but `MERGE` writes instead of `SET` |
+| `DELETE FROM (TAG t \| ROOT \| [GROUP] g) [WHERE expr] [LIMIT 1]` | `FOREACH` with the `WHERE` guard, then `DELETE` on the element |

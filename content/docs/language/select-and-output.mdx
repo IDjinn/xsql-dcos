@@ -22,12 +22,15 @@ FOREACH good IN goods
 ;
 ```
 
-## SELECT TAG
+## SELECT TAG / SELECT ROOT
 
-`SELECT TAG t` prints every element with tag `t`, at any depth:
+`SELECT TAG t` prints every element with tag `t`, at any depth; `SELECT
+ROOT` drops the tag filter and prints every element in the document, any
+tag — see [Group vs. Tag vs. Root](/docs/language/tag-vs-group):
 
 ```sql
 SELECT TAG ItemSpec;   all ItemSpec elements, any depth
+SELECT ROOT;           every element in the document, any tag
 ```
 
 ## OUTPUT
@@ -59,3 +62,38 @@ FOREACH office IN offices
 
 Here each printed row combines the outer `office` element with the inner
 `member` element currently being visited.
+
+## Aggregate OUTPUT: COUNT, MIN, MAX, SUM, AVG
+
+A regular `OUTPUT` prints one row per element the loop reaches. An
+**aggregate** `OUTPUT` instead summarizes every reached element into a
+single line of comma-joined plain numbers — no XML wrapper:
+
+```sql
+FOREACH v IN ItemSpec WHERE v.type = 0 OUTPUT COUNT(v.id);
+; -> 2
+
+FOREACH v IN ItemSpec WHERE v.type = 0
+    OUTPUT MIN(v.cost), MAX(v.cost), SUM(v.cost), AVG(v.cost)
+;
+; -> 10,30,40,20
+```
+
+Rules:
+
+- `COUNT(expr)` counts elements where `expr` is non-null; `MIN`/`MAX`/`SUM`/
+  `AVG` ignore elements where `expr` is missing or non-numeric (same
+  null-skipping spirit as everywhere else in the language).
+- Zero contributing elements reports `0` for every function, not an error.
+- An aggregate `OUTPUT` must be the loop's **only** `OUTPUT` — mixing it
+  with a plain attribute/expression, or with a second `OUTPUT`, is a parse
+  error, since there's no single row shape that could satisfy both a
+  per-element projection and a whole-loop summary.
+- Aliases (`AS name`) are accepted for readability but aren't printed — a
+  single summary row has nothing to disambiguate.
+- Aggregate functions are only valid as a direct `OUTPUT` item, not inside
+  `WHERE` or a `SET` expression.
+
+`COUNT`/`MIN`/`MAX`/`SUM`/`AVG` cover the common cases. Possible future
+additions: `FIRST`/`LAST` (first/last matching value), `CONCAT`/
+`GROUP_CONCAT` (join values with a separator), a distinct-values `COUNT`.

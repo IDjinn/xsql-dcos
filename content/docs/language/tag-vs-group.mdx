@@ -1,11 +1,11 @@
 ---
-title: Group vs. Tag
-description: Two different ways to select elements, and when to use each.
+title: Group vs. Tag vs. Root
+description: Three different ways to select elements, and when to use each.
 ---
 
-Nearly every verb can target either a **group** or a **tag**. Picking the
-wrong one is the most common source of surprise, so here's the direct
-comparison.
+Nearly every verb can target a **group**, a **tag**, or the document **root**.
+Picking the wrong one is the most common source of surprise, so here's the
+direct comparison.
 
 ## GROUP
 
@@ -53,21 +53,38 @@ A nested `TAG` search that matches nothing inside the current element
 simply iterates zero times — it does not fall back to a document-wide
 search.
 
+## ROOT
+
+`ROOT` is `TAG` with the tag filter removed entirely: it matches **every**
+element in the document, whatever its tag. Use it for a first exploratory
+pass over a file whose structure you don't know yet — no need to guess a
+tag name before you can look at the data:
+
+```sql
+SELECT ROOT OUTPUT id, type;                    ; every element, any tag
+FOREACH v IN ROOT WHERE v.type = 0 OUTPUT v.id; ; filter once you see the shape
+UPDATE ROOT SET reviewed = 1 WHERE cost > 500;
+```
+
+Once you know the real tag (or group) name, prefer `TAG`/`GROUP` — they're
+more precise and, for `GROUP`, cheaper to parallelize. Like `TAG`, `IN ROOT`
+inside a nested loop only searches the current element's subtree.
+
 ## Why it matters for parallelism
 
-`TAG` loops only take the parallel evaluate-then-apply path after a
-disjointness check: since tag matches can nest inside one another (an
-`ItemSpec` inside an `ItemSpec`, for instance), the interpreter verifies no
-match is nested inside another match before parallelizing. `GROUP` loops
-don't need this check, since a group's children are always a flat,
-non-overlapping set. See [Performance](/docs/performance) for the full
-picture.
+`TAG` and `ROOT` loops only take the parallel evaluate-then-apply path
+after a disjointness check: since their matches can nest inside one another
+(an `ItemSpec` inside an `ItemSpec`, or — for `ROOT` — any parent/child pair
+at all), the interpreter verifies no match is nested inside another match
+before parallelizing. `GROUP` loops don't need this check, since a group's
+children are always a flat, non-overlapping set. See
+[Performance](/docs/performance) for the full picture.
 
 ## Quick reference
 
-| | `GROUP g` | `TAG t` |
-|---|---|---|
-| Matches | first element with tag/name/id == `g` | every element with tag == `t` |
-| Depth | that one container | any depth |
-| Iterates | the container's direct children | the matches themselves |
-| Nested (`IN ...`) | a subgroup found inside the current element | the current element's subtree only |
+| | `GROUP g` | `TAG t` | `ROOT` |
+|---|---|---|---|
+| Matches | first element with tag/name/id == `g` | every element with tag == `t` | every element, any tag |
+| Depth | that one container | any depth | any depth |
+| Iterates | the container's direct children | the matches themselves | the matches themselves |
+| Nested (`IN ...`) | a subgroup found inside the current element | the current element's subtree only | the current element's subtree only |
